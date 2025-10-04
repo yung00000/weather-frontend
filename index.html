@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>香港天氣資訊 1</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            box-sizing: border-box;
+        }
+        .weather-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            backdrop-filter: blur(10px);
+        }
+        .station-card {
+            transition: all 0.3s ease;
+        }
+        .station-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        }
+        .loading {
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-gray-800 mb-2">🌤️ 香港天氣資訊</h1>
+            <p class="text-gray-600">香港天文台實時天氣數據</p>
+        </div>
+
+        <!-- Loading State -->
+        <div id="loading" class="text-center py-12">
+            <div class="loading text-2xl text-blue-600">載入中...</div>
+        </div>
+
+        <!-- Error State -->
+        <div id="error" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
+            <strong>錯誤：</strong>無法載入天氣資料，請稍後再試。
+        </div>
+
+        <!-- Main Weather Info -->
+        <div id="mainWeather" class="hidden weather-card rounded-2xl p-8 text-white mb-8 shadow-xl">
+            <div class="grid md:grid-cols-2 gap-6">
+                <div>
+                    <h2 class="text-2xl font-semibold mb-4">當前天氣概況</h2>
+                    <div id="condition" class="text-lg leading-relaxed"></div>
+                    <div id="humidity" class="text-lg mt-2"></div>
+                </div>
+                <div>
+                    <h3 class="text-xl font-semibold mb-4">更新時間</h3>
+                    <div id="updateTime" class="text-lg"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Warning Messages -->
+        <div id="warningSection" class="hidden mb-8">
+            <h2 class="text-2xl font-bold text-gray-800 mb-6">⚠️ 警告信息</h2>
+            <div id="warningList" class="bg-yellow-100 border border-yellow-400 text-yellow-800 px-4 py-3 rounded"></div>
+        </div>
+
+        <!-- Tropical Cyclone Message -->
+        <div id="tcMessageSection" class="hidden mb-8">
+            <h2 class="text-2xl font-bold text-gray-800 mb-6">🌀 熱帶氣旋資訊</h2>
+            <div id="tcMessage" class="bg-blue-100 border border-blue-400 text-blue-800 px-4 py-3 rounded whitespace-pre-line"></div>
+        </div>
+
+        <!-- Temperature Stations -->
+        <div id="temperatureSection" class="hidden mb-8">
+            <h2 class="text-2xl font-bold text-gray-800 mb-6">🌡️ 各區氣溫</h2>
+            <div id="temperatureGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"></div>
+        </div>
+
+        <!-- Rainfall Stations -->
+        <div id="rainfallSection" class="hidden mb-8">
+            <h2 class="text-2xl font-bold text-gray-800 mb-6">🌧️ 各區雨量</h2>
+            <p id="rainfallTime" class="text-gray-600 mb-4"></p>
+            <div id="rainfallGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"></div>
+        </div>
+
+        <!-- Refresh Button -->
+        <div class="text-center mt-8">
+            <button id="refreshBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition duration-300 shadow-lg">
+                🔄 重新載入
+            </button>
+        </div>
+    </div>
+
+    <script>
+        let weatherData = null;
+
+        async function fetchWeatherData() {
+            try {
+                showLoading();
+                const response = await fetch('http://localhost:3005/weather');
+                
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                
+                weatherData = await response.json();
+                displayWeatherData();
+                hideLoading();
+            } catch (error) {
+                console.error('Error fetching weather data:', error);
+                showError();
+                hideLoading();
+            }
+        }
+
+        function showLoading() {
+            document.getElementById('loading').classList.remove('hidden');
+            document.getElementById('error').classList.add('hidden');
+            document.getElementById('mainWeather').classList.add('hidden');
+            document.getElementById('warningSection').classList.add('hidden');
+            document.getElementById('tcMessageSection').classList.add('hidden');
+            document.getElementById('temperatureSection').classList.add('hidden');
+            document.getElementById('rainfallSection').classList.add('hidden');
+        }
+
+        function hideLoading() {
+            document.getElementById('loading').classList.add('hidden');
+        }
+
+        function showError() {
+            document.getElementById('error').classList.remove('hidden');
+        }
+
+        function displayWeatherData() {
+            if (!weatherData) return;
+
+            // Main Weather Info
+            document.getElementById('condition').textContent = weatherData.icon ? `天氣狀況: ${weatherData.icon}` : '暫無資料';
+            document.getElementById('humidity').textContent = weatherData.humidity ? `濕度: ${weatherData.humidity}%` : '暫無資料';
+            document.getElementById('updateTime').textContent = weatherData.updateTime 
+                ? new Date(weatherData.updateTime).toLocaleString('zh-HK') 
+                : '暫無資料';
+            document.getElementById('mainWeather').classList.remove('hidden');
+
+            // Warning Messages
+            if (weatherData.warningMessage?.length > 0) {
+                document.getElementById('warningList').innerHTML = weatherData.warningMessage
+                    .map(msg => `<p>${msg}</p>`).join('');
+                document.getElementById('warningSection').classList.remove('hidden');
+            }
+
+            // Tropical Cyclone Message
+            if (weatherData.tcMessage?.length > 0) {
+                document.getElementById('tcMessage').textContent = weatherData.tcMessage.join('\n');
+                document.getElementById('tcMessageSection').classList.remove('hidden');
+            }
+
+            // Temperature Data
+            if (weatherData.temperature?.length > 0) {
+                displayTemperatureData(weatherData.temperature);
+                document.getElementById('temperatureSection').classList.remove('hidden');
+            }
+
+            // Rainfall Data
+            if (weatherData.rainfall?.length > 0) {
+                displayRainfallData(weatherData.rainfall);
+                document.getElementById('rainfallTime').textContent = weatherData.rainfallTime?.startTime && weatherData.rainfallTime?.endTime 
+                    ? `記錄時間: ${new Date(weatherData.rainfallTime.startTime).toLocaleString('zh-HK')} 至 ${new Date(weatherData.rainfallTime.endTime).toLocaleString('zh-HK')}`
+                    : '暫無時間資料';
+                document.getElementById('rainfallSection').classList.remove('hidden');
+            }
+        }
+
+        function displayTemperatureData(tempData) {
+            const grid = document.getElementById('temperatureGrid');
+            grid.innerHTML = '';
+
+            tempData.forEach(station => {
+                const card = document.createElement('div');
+                card.className = 'station-card bg-white rounded-lg p-4 shadow-md';
+                
+                const temp = station.value !== undefined ? `${station.value}°C` : '暫無資料';
+                const tempColor = getTemperatureColor(station.value);
+                
+                card.innerHTML = `
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h3 class="font-semibold text-gray-800">${station.place}</h3>
+                            <p class="text-sm text-gray-600">${station.unit || ''}</p>
+                        </div>
+                        <div class="text-2xl font-bold ${tempColor}">
+                            ${temp}
+                        </div>
+                    </div>
+                `;
+                
+                grid.appendChild(card);
+            });
+        }
+
+        function displayRainfallData(rainData) {
+            const grid = document.getElementById('rainfallGrid');
+            grid.innerHTML = '';
+
+            rainData.forEach(station => {
+                const card = document.createElement('div');
+                card.className = 'station-card bg-white rounded-lg p-4 shadow-md';
+                
+                const rainfall = station.max !== undefined ? `${station.max}mm` : '暫無資料';
+                const rainColor = getRainfallColor(station.max);
+                
+                card.innerHTML = `
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h3 class="font-semibold text-gray-800">${station.place}</h3>
+                            <p class="text-sm text-gray-600">過去一小時</p>
+                        </div>
+                        <div class="text-2xl font-bold ${rainColor}">
+                            ${rainfall}
+                        </div>
+                    </div>
+                `;
+                
+                grid.appendChild(card);
+            });
+        }
+
+        function getTemperatureColor(temp) {
+            if (temp === undefined || temp === null) return 'text-gray-500';
+            if (temp >= 30) return 'text-red-500';
+            if (temp >= 25) return 'text-orange-500';
+            if (temp >= 20) return 'text-yellow-500';
+            if (temp >= 15) return 'text-green-500';
+            return 'text-blue-500';
+        }
+
+        function getRainfallColor(rainfall) {
+            if (rainfall === undefined || rainfall === null) return 'text-gray-500';
+            if (rainfall >= 10) return 'text-blue-600';
+            if (rainfall >= 5) return 'text-blue-500';
+            if (rainfall >= 1) return 'text-blue-400';
+            return 'text-gray-400';
+        }
+
+        // Event listeners
+        document.getElementById('refreshBtn').addEventListener('click', fetchWeatherData);
+
+        // Initial load
+        fetchWeatherData();
+
+        // Auto refresh every 10 minutes
+        setInterval(fetchWeatherData, 600000);
+    </script>
+</body>
+</html>
