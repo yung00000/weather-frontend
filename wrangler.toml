@@ -1,4 +1,3 @@
 name = "hkweather-frontend"
 compatibility_date = "2025-10-05"
-[site]
-bucket = "./"  # current directory
+pages_build_output = "./"
