@@ -47,6 +47,16 @@
             <strong>錯誤：</strong>無法載入天氣資料，請稍後再試。
         </div>
 
+        <!-- Current Location Weather -->
+        <div id="currentLocationWeather" class="hidden weather-card rounded-2xl p-8 text-white mb-8 shadow-xl">
+            <div class="text-center">
+                <h2 class="text-3xl font-bold mb-4">📍 您的位置</h2>
+                <div id="currentLocationInfo" class="text-lg mb-4"></div>
+                <div id="currentLocationTemp" class="text-4xl font-bold mb-2"></div>
+                <div id="currentLocationDetails" class="text-lg"></div>
+            </div>
+        </div>
+
         <!-- Main Weather Info -->
         <div id="mainWeather" class="hidden weather-card rounded-2xl p-8 text-white mb-8 shadow-xl">
             <div class="grid md:grid-cols-2 gap-6">
@@ -87,8 +97,11 @@
             <div id="rainfallGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"></div>
         </div>
 
-        <!-- Refresh Button -->
-        <div class="text-center mt-8">
+        <!-- Action Buttons -->
+        <div class="text-center mt-8 space-x-4">
+            <button id="locationBtn" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-6 rounded-lg transition duration-300 shadow-lg">
+                📍 獲取我的位置
+            </button>
             <button id="refreshBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition duration-300 shadow-lg">
                 🔄 重新載入
             </button>
@@ -97,6 +110,138 @@
 
     <script>
         let weatherData = null;
+        let userLocation = null;
+        let nearestStation = null;
+
+        // GPS Location Functions
+        function getCurrentLocation() {
+            return new Promise((resolve, reject) => {
+                if (!navigator.geolocation) {
+                    reject(new Error('Geolocation is not supported by this browser.'));
+                    return;
+                }
+
+                const options = {
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                    maximumAge: 300000 // 5 minutes
+                };
+
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        userLocation = {
+                            latitude: position.coords.latitude,
+                            longitude: position.coords.longitude
+                        };
+                        resolve(userLocation);
+                    },
+                    (error) => {
+                        console.error('Error getting location:', error);
+                        reject(error);
+                    },
+                    options
+                );
+            });
+        }
+
+        // Calculate distance between two coordinates using Haversine formula
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371; // Earth's radius in kilometers
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                    Math.sin(dLon/2) * Math.sin(dLon/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c;
+        }
+
+        // Find nearest weather station
+        function findNearestStation(stations) {
+            if (!userLocation || !stations || stations.length === 0) {
+                return null;
+            }
+
+            let nearest = null;
+            let minDistance = Infinity;
+
+            // Hong Kong weather station coordinates (approximate)
+            const stationCoordinates = {
+                '中環': { lat: 22.2813, lon: 114.1577 },
+                '香港公園': { lat: 22.2778, lon: 114.1611 },
+                '跑馬地': { lat: 22.2700, lon: 114.1833 },
+                '黃竹坑': { lat: 22.2500, lon: 114.1667 },
+                '筲箕灣': { lat: 22.2833, lon: 114.2333 },
+                '九龍城': { lat: 22.3167, lon: 114.1833 },
+                '觀塘': { lat: 22.3167, lon: 114.2167 },
+                '啟德': { lat: 22.3167, lon: 114.2000 },
+                '深水埗': { lat: 22.3333, lon: 114.1500 },
+                '荃灣': { lat: 22.3667, lon: 114.1167 },
+                '屯門': { lat: 22.4000, lon: 113.9833 },
+                '沙田': { lat: 22.3833, lon: 114.1833 },
+                '大埔': { lat: 22.4500, lon: 114.1667 },
+                '上水': { lat: 22.5000, lon: 114.1333 },
+                '元朗': { lat: 22.4500, lon: 114.0333 },
+                '大澳': { lat: 22.2500, lon: 113.8500 },
+                '長洲': { lat: 22.2167, lon: 114.0333 },
+                '赤鱲角': { lat: 22.3167, lon: 113.9167 },
+                '青衣': { lat: 22.3500, lon: 114.1000 },
+                '石崗': { lat: 22.4333, lon: 114.0833 },
+                '流浮山': { lat: 22.4667, lon: 113.9833 },
+                '打鼓嶺': { lat: 22.5333, lon: 114.1500 },
+                '西貢': { lat: 22.3167, lon: 114.2667 },
+                '將軍澳': { lat: 22.3167, lon: 114.2500 },
+                '清水灣': { lat: 22.2833, lon: 114.2833 },
+                '香港國際機場': { lat: 22.3167, lon: 113.9167 },
+                '昂坪': { lat: 22.2500, lon: 113.9000 },
+                '坪洲': { lat: 22.2833, lon: 114.0333 },
+                '南丫島': { lat: 22.2167, lon: 114.1167 },
+                '塔門': { lat: 22.4667, lon: 114.3500 },
+                '大帽山': { lat: 22.4000, lon: 114.1167 },
+                '山頂': { lat: 22.2667, lon: 114.1500 }
+            };
+
+            stations.forEach(station => {
+                const coords = stationCoordinates[station.place];
+                if (coords) {
+                    const distance = calculateDistance(
+                        userLocation.latitude, 
+                        userLocation.longitude, 
+                        coords.lat, 
+                        coords.lon
+                    );
+                    
+                    if (distance < minDistance) {
+                        minDistance = distance;
+                        nearest = { ...station, distance: distance };
+                    }
+                }
+            });
+
+            return nearest;
+        }
+
+        // Display current location weather
+        function displayCurrentLocationWeather() {
+            if (!nearestStation) {
+                document.getElementById('currentLocationWeather').classList.add('hidden');
+                return;
+            }
+
+            const locationInfo = document.getElementById('currentLocationInfo');
+            const locationTemp = document.getElementById('currentLocationTemp');
+            const locationDetails = document.getElementById('currentLocationDetails');
+
+            locationInfo.textContent = `最近氣象站: ${nearestStation.place}`;
+            
+            const temp = nearestStation.value !== undefined ? `${nearestStation.value}°C` : '暫無資料';
+            const tempColor = getTemperatureColor(nearestStation.value);
+            locationTemp.innerHTML = `<span class="${tempColor}">${temp}</span>`;
+            
+            locationDetails.textContent = `距離約 ${nearestStation.distance.toFixed(1)} 公里`;
+            
+            document.getElementById('currentLocationWeather').classList.remove('hidden');
+        }
 
         async function fetchWeatherData() {
             try {
@@ -111,7 +256,7 @@
                 }
                 
                 weatherData = await response.json();
-                displayWeatherData();
+                await displayWeatherData();
                 hideLoading();
             } catch (error) {
                 console.error('Error fetching weather data:', error);
@@ -123,6 +268,7 @@
         function showLoading() {
             document.getElementById('loading').classList.remove('hidden');
             document.getElementById('error').classList.add('hidden');
+            document.getElementById('currentLocationWeather').classList.add('hidden');
             document.getElementById('mainWeather').classList.add('hidden');
             document.getElementById('warningSection').classList.add('hidden');
             document.getElementById('tcMessageSection').classList.add('hidden');
@@ -138,8 +284,23 @@
             document.getElementById('error').classList.remove('hidden');
         }
 
-        function displayWeatherData() {
+        async function displayWeatherData() {
             if (!weatherData) return;
+
+            // Try to get user location and find nearest station
+            try {
+                if (!userLocation) {
+                    await getCurrentLocation();
+                }
+                
+                if (weatherData.temperature?.length > 0) {
+                    nearestStation = findNearestStation(weatherData.temperature);
+                    displayCurrentLocationWeather();
+                }
+            } catch (error) {
+                console.log('Location access denied or unavailable:', error.message);
+                // Continue without location data
+            }
 
             // Main Weather Info
             document.getElementById('condition').textContent = weatherData.icon ? `天氣狀況: ${weatherData.icon}` : '暫無資料';
@@ -251,6 +412,17 @@
 
         // Event listeners
         document.getElementById('refreshBtn').addEventListener('click', fetchWeatherData);
+        document.getElementById('locationBtn').addEventListener('click', async () => {
+            try {
+                await getCurrentLocation();
+                if (weatherData && weatherData.temperature?.length > 0) {
+                    nearestStation = findNearestStation(weatherData.temperature);
+                    displayCurrentLocationWeather();
+                }
+            } catch (error) {
+                alert('無法獲取位置信息，請檢查瀏覽器權限設置。');
+            }
+        });
 
         // Initial load
         fetchWeatherData();
