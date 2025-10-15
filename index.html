@@ -48,12 +48,25 @@
         </div>
 
         <!-- Current Location Weather -->
-        <div id="currentLocationWeather" class="hidden weather-card rounded-2xl p-8 text-white mb-8 shadow-xl">
+        <div id="currentLocationWeather" class="hidden weather-card rounded-2xl p-6 text-white mb-8 shadow-xl">
             <div class="text-center">
-                <h2 class="text-3xl font-bold mb-4">📍 您的位置</h2>
-                <div id="currentLocationInfo" class="text-lg mb-4"></div>
-                <div id="currentLocationTemp" class="text-4xl font-bold mb-2"></div>
-                <div id="currentLocationDetails" class="text-lg"></div>
+                <h2 class="text-2xl font-bold mb-3">📍 您的位置</h2>
+                <div id="currentLocationInfo" class="text-base mb-3"></div>
+                
+                <!-- Temperature and Rainfall Row -->
+                <div class="flex justify-center items-center space-x-8 mb-3">
+                    <div class="text-center">
+                        <div class="text-sm text-white/80 mb-1">氣溫</div>
+                        <div id="currentLocationTemp" class="text-3xl font-bold"></div>
+                    </div>
+                    <div class="w-px h-12 bg-white/30"></div>
+                    <div class="text-center">
+                        <div class="text-sm text-white/80 mb-1">雨量</div>
+                        <div id="currentLocationRainfall" class="text-3xl font-bold"></div>
+                    </div>
+                </div>
+                
+                <div id="currentLocationDetails" class="text-sm text-white/80"></div>
             </div>
         </div>
 
@@ -111,7 +124,8 @@
     <script>
         let weatherData = null;
         let userLocation = null;
-        let nearestStation = null;
+        let nearestTempStation = null;
+        let nearestRainfallStation = null;
 
         // GPS Location Functions
         function getCurrentLocation() {
@@ -223,22 +237,40 @@
 
         // Display current location weather
         function displayCurrentLocationWeather() {
-            if (!nearestStation) {
+            if (!nearestTempStation && !nearestRainfallStation) {
                 document.getElementById('currentLocationWeather').classList.add('hidden');
                 return;
             }
 
             const locationInfo = document.getElementById('currentLocationInfo');
             const locationTemp = document.getElementById('currentLocationTemp');
+            const locationRainfall = document.getElementById('currentLocationRainfall');
             const locationDetails = document.getElementById('currentLocationDetails');
 
-            locationInfo.textContent = `最近氣象站: ${nearestStation.place}`;
+            // Use temperature station for location info if available, otherwise rainfall station
+            const primaryStation = nearestTempStation || nearestRainfallStation;
+            locationInfo.textContent = `最近氣象站: ${primaryStation.place}`;
             
-            const temp = nearestStation.value !== undefined ? `${nearestStation.value}°C` : '暫無資料';
-            const tempColor = getTemperatureColor(nearestStation.value);
-            locationTemp.innerHTML = `<span class="${tempColor}">${temp}</span>`;
+            // Display temperature
+            if (nearestTempStation) {
+                const temp = nearestTempStation.value !== undefined ? `${nearestTempStation.value}°C` : '暫無資料';
+                const tempColor = getTemperatureColor(nearestTempStation.value);
+                locationTemp.innerHTML = `<span class="${tempColor}">${temp}</span>`;
+            } else {
+                locationTemp.innerHTML = '<span class="text-white/60">暫無資料</span>';
+            }
             
-            locationDetails.textContent = `距離約 ${nearestStation.distance.toFixed(1)} 公里`;
+            // Display rainfall
+            if (nearestRainfallStation) {
+                const rainfall = nearestRainfallStation.max !== undefined ? `${nearestRainfallStation.max}mm` : '0mm';
+                const rainColor = getRainfallColor(nearestRainfallStation.max);
+                locationRainfall.innerHTML = `<span class="${rainColor}">${rainfall}</span>`;
+            } else {
+                locationRainfall.innerHTML = '<span class="text-white/60">暫無資料</span>';
+            }
+            
+            // Show distance from primary station
+            locationDetails.textContent = `距離約 ${primaryStation.distance.toFixed(1)} 公里`;
             
             document.getElementById('currentLocationWeather').classList.remove('hidden');
         }
@@ -287,16 +319,21 @@
         async function displayWeatherData() {
             if (!weatherData) return;
 
-            // Try to get user location and find nearest station
+            // Try to get user location and find nearest stations
             try {
                 if (!userLocation) {
                     await getCurrentLocation();
                 }
                 
                 if (weatherData.temperature?.length > 0) {
-                    nearestStation = findNearestStation(weatherData.temperature);
-                    displayCurrentLocationWeather();
+                    nearestTempStation = findNearestStation(weatherData.temperature);
                 }
+                
+                if (weatherData.rainfall?.length > 0) {
+                    nearestRainfallStation = findNearestStation(weatherData.rainfall);
+                }
+                
+                displayCurrentLocationWeather();
             } catch (error) {
                 console.log('Location access denied or unavailable:', error.message);
                 // Continue without location data
@@ -415,8 +452,13 @@
         document.getElementById('locationBtn').addEventListener('click', async () => {
             try {
                 await getCurrentLocation();
-                if (weatherData && weatherData.temperature?.length > 0) {
-                    nearestStation = findNearestStation(weatherData.temperature);
+                if (weatherData) {
+                    if (weatherData.temperature?.length > 0) {
+                        nearestTempStation = findNearestStation(weatherData.temperature);
+                    }
+                    if (weatherData.rainfall?.length > 0) {
+                        nearestRainfallStation = findNearestStation(weatherData.rainfall);
+                    }
                     displayCurrentLocationWeather();
                 }
             } catch (error) {
