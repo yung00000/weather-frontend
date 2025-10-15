@@ -27,6 +27,22 @@
             0%, 100% { opacity: 1; }
             50% { opacity: 0.5; }
         }
+        /* Remove any highlighting from temperature display */
+        .station-card * {
+            background: none !important;
+            background-color: transparent !important;
+            box-shadow: none !important;
+            outline: none !important;
+        }
+        /* Specifically target temperature text to remove highlighting */
+        .station-card .text-2xl {
+            background: transparent !important;
+            background-color: transparent !important;
+            box-shadow: none !important;
+            outline: none !important;
+            -webkit-tap-highlight-color: transparent !important;
+            -webkit-highlight: none !important;
+        }
     </style>
 </head>
 <body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
