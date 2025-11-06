@@ -171,7 +171,7 @@
         <!-- Action Buttons -->
         <div class="text-center mt-8 space-x-4">
             <button id="locationBtn" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-6 rounded-lg transition duration-300 shadow-lg">
-                📍 獲取我的位置
+                📍 更新位置
             </button>
             <button id="refreshBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition duration-300 shadow-lg">
                 🔄 重新載入
@@ -234,8 +234,17 @@
         async function displayWeatherData() {
             if (!weatherData) return;
 
-            // Try to find nearest stations if location is already available
-            // Don't automatically request location - user must click the button
+            // Automatically try to get location if not available
+            if (!userLocation) {
+                try {
+                    await getCurrentLocation();
+                } catch (error) {
+                    console.log('Location access denied or unavailable:', error.message);
+                    // Continue without location data - don't show error to user
+                }
+            }
+
+            // Try to find nearest stations if location is available
             if (userLocation) {
                 try {
                     if (weatherData.temperature?.length > 0) {
@@ -424,12 +433,16 @@
                     },
                     (error) => {
                         console.error('Error getting location:', error);
+                        // Don't reject for permission denied - just log it
+                        if (error.code === error.PERMISSION_DENIED) {
+                            console.log('Location permission denied by user');
+                        }
                         reject(error);
                     },
                     {
                         enableHighAccuracy: true,
-                        timeout: 10000,
-                        maximumAge: 0
+                        timeout: 15000,
+                        maximumAge: 300000 // Cache location for 5 minutes
                     }
                 );
             });
@@ -576,12 +589,17 @@
             document.getElementById('locationSection').classList.remove('hidden');
         }
 
-        // Handle location button click
+        // Handle location button click - force refresh location
         async function handleLocationButtonClick() {
             try {
                 const button = document.getElementById('locationBtn');
                 button.disabled = true;
                 button.textContent = '📍 獲取位置中...';
+
+                // Clear existing location to force refresh
+                userLocation = null;
+                nearestTempStation = null;
+                nearestRainfallStation = null;
 
                 await getCurrentLocation();
 
@@ -593,15 +611,29 @@
                         nearestRainfallStation = findNearestStation(weatherData.rainfall);
                     }
                     displayCurrentLocationWeather();
+                    
+                    // Update temperature and rainfall in combined card
+                    if (nearestTempStation) {
+                        const temp = nearestTempStation.value !== undefined 
+                            ? `${nearestTempStation.value}°C` 
+                            : '暫無資料';
+                        document.getElementById('combinedTemperature').textContent = temp;
+                    }
+                    if (nearestRainfallStation) {
+                        const rainfall = nearestRainfallStation.max !== undefined 
+                            ? `${nearestRainfallStation.max}mm` 
+                            : '暫無資料';
+                        document.getElementById('combinedRainfall').textContent = rainfall;
+                    }
                 }
 
                 button.disabled = false;
-                button.textContent = '📍 獲取我的位置';
+                button.textContent = '📍 更新位置';
             } catch (error) {
                 alert('無法獲取您的位置。請確保已允許瀏覽器訪問位置權限。\n\n' + error.message);
                 const button = document.getElementById('locationBtn');
                 button.disabled = false;
-                button.textContent = '📍 獲取我的位置';
+                button.textContent = '📍 更新位置';
             }
         }
 
