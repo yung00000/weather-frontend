@@ -27,6 +27,22 @@
             0%, 100% { opacity: 1; }
             50% { opacity: 0.5; }
         }
+        /* Remove any highlighting from temperature display */
+        .station-card * {
+            background: none !important;
+            background-color: transparent !important;
+            box-shadow: none !important;
+            outline: none !important;
+        }
+        /* Specifically target temperature text to remove highlighting */
+        .station-card .text-2xl {
+            background: transparent !important;
+            background-color: transparent !important;
+            box-shadow: none !important;
+            outline: none !important;
+            -webkit-tap-highlight-color: transparent !important;
+            -webkit-highlight: none !important;
+        }
     </style>
 </head>
 <body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
@@ -45,6 +61,29 @@
         <!-- Error State -->
         <div id="error" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
             <strong>錯誤：</strong>無法載入天氣資料，請稍後再試。
+        </div>
+
+        <!-- Current Location Weather -->
+        <div id="currentLocationWeather" class="hidden weather-card rounded-2xl p-6 text-white mb-8 shadow-xl">
+            <div class="text-center">
+                <h2 class="text-2xl font-bold mb-3">📍 您的位置</h2>
+                <div id="currentLocationInfo" class="text-base mb-3"></div>
+                
+                <!-- Temperature and Rainfall Row -->
+                <div class="flex justify-center items-center space-x-8 mb-3">
+                    <div class="text-center">
+                        <div class="text-sm text-white/80 mb-1">氣溫</div>
+                        <div id="currentLocationTemp" class="text-3xl font-bold"></div>
+                    </div>
+                    <div class="w-px h-12 bg-white/30"></div>
+                    <div class="text-center">
+                        <div class="text-sm text-white/80 mb-1">雨量</div>
+                        <div id="currentLocationRainfall" class="text-3xl font-bold"></div>
+                    </div>
+                </div>
+                
+                <div id="currentLocationDetails" class="text-sm text-white/80"></div>
+            </div>
         </div>
 
         <!-- Main Weather Info -->
@@ -115,8 +154,11 @@
             </div>
         </div>
 
-        <!-- Refresh Button -->
-        <div class="text-center mt-8">
+        <!-- Action Buttons -->
+        <div class="text-center mt-8 space-x-4">
+            <button id="locationBtn" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-6 rounded-lg transition duration-300 shadow-lg">
+                📍 獲取我的位置
+            </button>
             <button id="refreshBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition duration-300 shadow-lg">
                 🔄 重新載入
             </button>
@@ -125,13 +167,11 @@
 
     <script>
         let weatherData = null;
-        let temperatureStations = [];
-        let rainfallStations = [];
 
         async function fetchWeatherData() {
             try {
                 showLoading();
-                const response = await fetch('https://hkweather-backend.yung0000.workers.dev/weather');
+                const response = await fetch('https://weather-backend.ystudiohk.com/weather');
                 
                 <!--https://data.weather.gov.hk/weatherAPI/opendata/weather.php-->
                 
@@ -141,7 +181,7 @@
                 }
                 
                 weatherData = await response.json();
-                displayWeatherData();
+                await displayWeatherData();
                 hideLoading();
             } catch (error) {
                 console.error('Error fetching weather data:', error);
@@ -153,6 +193,7 @@
         function showLoading() {
             document.getElementById('loading').classList.remove('hidden');
             document.getElementById('error').classList.add('hidden');
+            document.getElementById('currentLocationWeather').classList.add('hidden');
             document.getElementById('mainWeather').classList.add('hidden');
             document.getElementById('warningSection').classList.add('hidden');
             document.getElementById('tcMessageSection').classList.add('hidden');
@@ -170,8 +211,28 @@
             document.getElementById('error').classList.remove('hidden');
         }
 
-        function displayWeatherData() {
+        async function displayWeatherData() {
             if (!weatherData) return;
+
+            // Try to get user location and find nearest stations
+            try {
+                if (!userLocation) {
+                    await getCurrentLocation();
+                }
+                
+                if (weatherData.temperature?.length > 0) {
+                    nearestTempStation = findNearestStation(weatherData.temperature);
+                }
+                
+                if (weatherData.rainfall?.length > 0) {
+                    nearestRainfallStation = findNearestStation(weatherData.rainfall);
+                }
+                
+                displayCurrentLocationWeather();
+            } catch (error) {
+                console.log('Location access denied or unavailable:', error.message);
+                // Continue without location data
+            }
 
             // Main Weather Info
             document.getElementById('condition').textContent = weatherData.icon ? `天氣狀況: ${weatherData.icon}` : '暫無資料';
@@ -293,12 +354,6 @@
 
         // Event listeners
         document.getElementById('refreshBtn').addEventListener('click', fetchWeatherData);
-        document.getElementById('temperatureSelect').addEventListener('change', (e) => {
-            displaySelectedTemperature(e.target.value);
-        });
-        document.getElementById('rainfallSelect').addEventListener('change', (e) => {
-            displaySelectedRainfall(e.target.value);
-        });
 
         // Initial load
         fetchWeatherData();
