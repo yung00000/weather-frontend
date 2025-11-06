@@ -168,6 +168,53 @@
             </div>
         </div>
 
+        <!-- 9-Day Weather Forecast -->
+        <div id="forecastSection" class="hidden mb-8">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4">📅 9天天氣預報</h2>
+            
+            <!-- General Situation -->
+            <div id="generalSituation" class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                <h3 class="text-lg font-semibold text-gray-800 mb-2">天氣概況</h3>
+                <p id="generalSituationText" class="text-gray-700 leading-relaxed"></p>
+            </div>
+
+            <!-- Forecast Table -->
+            <div class="overflow-x-auto">
+                <table class="min-w-full bg-white rounded-lg shadow-md overflow-hidden">
+                    <thead class="bg-gradient-to-r from-blue-500 to-indigo-600 text-white">
+                        <tr>
+                            <th class="px-4 py-3 text-left text-sm font-semibold">日期</th>
+                            <th class="px-4 py-3 text-left text-sm font-semibold">星期</th>
+                            <th class="px-4 py-3 text-center text-sm font-semibold">天氣</th>
+                            <th class="px-4 py-3 text-center text-sm font-semibold">溫度</th>
+                            <th class="px-4 py-3 text-center text-sm font-semibold">濕度</th>
+                            <th class="px-4 py-3 text-center text-sm font-semibold">風向/風力</th>
+                        </tr>
+                    </thead>
+                    <tbody id="forecastTableBody" class="divide-y divide-gray-200">
+                        <!-- Forecast rows will be inserted here -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Additional Info -->
+            <div id="forecastAdditionalInfo" class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <!-- Sea Temperature -->
+                <div id="seaTempCard" class="hidden bg-white rounded-lg p-4 shadow-md">
+                    <h3 class="text-sm font-semibold text-gray-600 mb-2">🌊 海水溫度</h3>
+                    <div id="seaTempInfo" class="text-lg font-bold text-blue-600"></div>
+                </div>
+                
+                <!-- Soil Temperature -->
+                <div id="soilTempCard" class="hidden bg-white rounded-lg p-4 shadow-md">
+                    <h3 class="text-sm font-semibold text-gray-600 mb-2">🌱 土壤溫度</h3>
+                    <div id="soilTempInfo"></div>
+                </div>
+            </div>
+
+            <p id="forecastUpdateTime" class="text-sm text-gray-500 mt-4 text-right"></p>
+        </div>
+
         <!-- Action Buttons -->
         <div class="text-center mt-8 space-x-4">
             <button id="locationBtn" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-6 rounded-lg transition duration-300 shadow-lg">
@@ -181,6 +228,7 @@
 
     <script>
         let weatherData = null;
+        let forecastData = null;
         let userLocation = null;
         let nearestTempStation = null;
         let nearestRainfallStation = null;
@@ -221,6 +269,7 @@
             document.getElementById('temperatureDisplay').classList.add('hidden');
             document.getElementById('rainfallSection').classList.add('hidden');
             document.getElementById('rainfallDisplay').classList.add('hidden');
+            document.getElementById('forecastSection').classList.add('hidden');
         }
 
         function hideLoading() {
@@ -637,8 +686,137 @@
             }
         }
 
+        // Fetch 9-day weather forecast
+        async function fetchForecastData() {
+            try {
+                const response = await fetch('https://hkweather-backend.yung0000.workers.dev/weather/9day');
+                
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                
+                forecastData = await response.json();
+                displayForecastData();
+            } catch (error) {
+                console.error('Error fetching forecast data:', error);
+                // Don't show error to user, just hide forecast section
+                document.getElementById('forecastSection').classList.add('hidden');
+            }
+        }
+
+        // Display 9-day forecast data
+        function displayForecastData() {
+            if (!forecastData) return;
+
+            // Display general situation
+            if (forecastData.generalSituation) {
+                document.getElementById('generalSituationText').textContent = forecastData.generalSituation;
+                document.getElementById('generalSituation').classList.remove('hidden');
+            }
+
+            // Display forecast table
+            if (forecastData.weatherForecast && forecastData.weatherForecast.length > 0) {
+                const tbody = document.getElementById('forecastTableBody');
+                tbody.innerHTML = '';
+
+                forecastData.weatherForecast.forEach(forecast => {
+                    const row = document.createElement('tr');
+                    row.className = 'hover:bg-gray-50 transition-colors';
+
+                    // Format date (YYYYMMDD to readable format)
+                    const dateStr = forecast.forecastDate;
+                    const year = dateStr.substring(0, 4);
+                    const month = dateStr.substring(4, 6);
+                    const day = dateStr.substring(6, 8);
+                    const formattedDate = `${year}/${month}/${day}`;
+
+                    // Temperature range
+                    const maxTemp = forecast.forecastMaxtemp?.value || 'N/A';
+                    const minTemp = forecast.forecastMintemp?.value || 'N/A';
+                    const tempDisplay = `${maxTemp}°C / ${minTemp}°C`;
+
+                    // Humidity range
+                    const maxRh = forecast.forecastMaxrh?.value || 'N/A';
+                    const minRh = forecast.forecastMinrh?.value || 'N/A';
+                    const rhDisplay = `${maxRh}% / ${minRh}%`;
+
+                    // Weather icon emoji based on ForecastIcon
+                    const iconCode = forecast.ForecastIcon;
+                    let weatherIcon = '🌤️';
+                    if (iconCode >= 50 && iconCode < 60) weatherIcon = '☀️';
+                    else if (iconCode >= 60 && iconCode < 70) weatherIcon = '🌧️';
+                    else if (iconCode >= 70 && iconCode < 80) weatherIcon = '⛈️';
+                    else if (iconCode >= 80) weatherIcon = '🌫️';
+
+                    row.innerHTML = `
+                        <td class="px-4 py-3 text-sm font-medium text-gray-900">${formattedDate}</td>
+                        <td class="px-4 py-3 text-sm text-gray-700">${forecast.week || ''}</td>
+                        <td class="px-4 py-3 text-center">
+                            <div class="flex flex-col items-center">
+                                <span class="text-xl mb-1">${weatherIcon}</span>
+                                <span class="text-sm text-gray-700">${forecast.forecastWeather || 'N/A'}</span>
+                            </div>
+                        </td>
+                        <td class="px-4 py-3 text-center text-sm font-semibold text-gray-900">${tempDisplay}</td>
+                        <td class="px-4 py-3 text-center text-sm text-gray-700">${rhDisplay}</td>
+                        <td class="px-4 py-3 text-center text-sm text-gray-700">${forecast.forecastWind || 'N/A'}</td>
+                    `;
+
+                    tbody.appendChild(row);
+                });
+
+                document.getElementById('forecastSection').classList.remove('hidden');
+            }
+
+            // Display sea temperature
+            if (forecastData.seaTemp) {
+                const seaTemp = forecastData.seaTemp;
+                const seaTempText = `${seaTemp.place}: ${seaTemp.value}${seaTemp.unit || '°C'}`;
+                if (seaTemp.recordTime) {
+                    const recordTime = new Date(seaTemp.recordTime).toLocaleString('zh-HK');
+                    document.getElementById('seaTempInfo').innerHTML = `
+                        <div class="text-lg font-bold text-blue-600">${seaTempText}</div>
+                        <div class="text-xs text-gray-500 mt-1">記錄時間: ${recordTime}</div>
+                    `;
+                } else {
+                    document.getElementById('seaTempInfo').textContent = seaTempText;
+                }
+                document.getElementById('seaTempCard').classList.remove('hidden');
+            }
+
+            // Display soil temperature
+            if (forecastData.soilTemp && forecastData.soilTemp.length > 0) {
+                const soilTempInfo = document.getElementById('soilTempInfo');
+                soilTempInfo.innerHTML = '';
+                
+                forecastData.soilTemp.forEach(soil => {
+                    const depth = soil.depth ? `${soil.depth.value}${soil.depth.unit || 'm'}` : '';
+                    const recordTime = soil.recordTime ? new Date(soil.recordTime).toLocaleString('zh-HK') : '';
+                    const soilDiv = document.createElement('div');
+                    soilDiv.className = 'mb-2';
+                    soilDiv.innerHTML = `
+                        <div class="text-base font-semibold text-gray-800">${soil.place} ${depth ? `(${depth})` : ''}</div>
+                        <div class="text-lg font-bold text-green-600">${soil.value}${soil.unit || '°C'}</div>
+                        ${recordTime ? `<div class="text-xs text-gray-500 mt-1">記錄時間: ${recordTime}</div>` : ''}
+                    `;
+                    soilTempInfo.appendChild(soilDiv);
+                });
+                
+                document.getElementById('soilTempCard').classList.remove('hidden');
+            }
+
+            // Display update time
+            if (forecastData.updateTime) {
+                const updateTime = new Date(forecastData.updateTime).toLocaleString('zh-HK');
+                document.getElementById('forecastUpdateTime').textContent = `更新時間: ${updateTime}`;
+            }
+        }
+
         // Event listeners
-        document.getElementById('refreshBtn').addEventListener('click', fetchWeatherData);
+        document.getElementById('refreshBtn').addEventListener('click', () => {
+            fetchWeatherData();
+            fetchForecastData();
+        });
         document.getElementById('locationBtn').addEventListener('click', handleLocationButtonClick);
         document.getElementById('temperatureSelect').addEventListener('change', (e) => {
             displaySelectedTemperature(e.target.value);
@@ -649,9 +827,13 @@
 
         // Initial load
         fetchWeatherData();
+        fetchForecastData();
 
         // Auto refresh every 10 minutes
-        setInterval(fetchWeatherData, 600000);
+        setInterval(() => {
+            fetchWeatherData();
+            fetchForecastData();
+        }, 600000);
     </script>
 </body>
 </html>
