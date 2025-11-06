@@ -173,9 +173,9 @@
             <h2 class="text-2xl font-bold text-gray-800 mb-4">📅 9天天氣預報</h2>
             
             <!-- General Situation -->
-            <div id="generalSituation" class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-                <h3 class="text-lg font-semibold text-gray-800 mb-2">天氣概況</h3>
-                <p id="generalSituationText" class="text-gray-700 leading-relaxed"></p>
+            <div id="generalSituation" class="bg-blue-50 border border-blue-200 rounded-lg p-3 md:p-4 mb-4 md:mb-6">
+                <h3 class="text-base md:text-lg font-semibold text-gray-800 mb-1 md:mb-2">天氣概況</h3>
+                <p id="generalSituationText" class="text-sm md:text-base text-gray-700 leading-tight md:leading-relaxed"></p>
             </div>
 
             <!-- Forecast Table -->
@@ -183,12 +183,12 @@
                 <table class="min-w-full bg-white rounded-lg shadow-md overflow-hidden">
                     <thead class="bg-gradient-to-r from-blue-500 to-indigo-600 text-white">
                         <tr>
-                            <th class="px-4 py-3 text-left text-sm font-semibold">日期</th>
-                            <th class="px-4 py-3 text-left text-sm font-semibold">星期</th>
-                            <th class="px-4 py-3 text-center text-sm font-semibold">天氣</th>
-                            <th class="px-4 py-3 text-center text-sm font-semibold">溫度</th>
-                            <th class="px-4 py-3 text-center text-sm font-semibold">濕度</th>
-                            <th class="px-4 py-3 text-center text-sm font-semibold">風向/風力</th>
+                            <th class="px-2 py-2 md:px-4 md:py-3 text-left text-xs md:text-sm font-semibold">日期</th>
+                            <th class="px-2 py-2 md:px-4 md:py-3 text-left text-xs md:text-sm font-semibold hidden sm:table-cell">星期</th>
+                            <th class="px-2 py-2 md:px-4 md:py-3 text-center text-xs md:text-sm font-semibold">天氣</th>
+                            <th class="px-2 py-2 md:px-4 md:py-3 text-center text-xs md:text-sm font-semibold">溫度</th>
+                            <th class="px-2 py-2 md:px-4 md:py-3 text-center text-xs md:text-sm font-semibold hidden md:table-cell">濕度</th>
+                            <th class="px-2 py-2 md:px-4 md:py-3 text-center text-xs md:text-sm font-semibold">風向/風力</th>
                         </tr>
                     </thead>
                     <tbody id="forecastTableBody" class="divide-y divide-gray-200">
@@ -747,18 +747,47 @@
                     else if (iconCode >= 70 && iconCode < 80) weatherIcon = '⛈️';
                     else if (iconCode >= 80) weatherIcon = '🌫️';
 
+                    // Truncate long text for mobile
+                    const weatherText = forecast.forecastWeather || 'N/A';
+                    const windText = forecast.forecastWind || 'N/A';
+                    
+                    // Shorten weather text for mobile (keep first part before period)
+                    let shortWeatherText = weatherText;
+                    if (weatherText.includes('。')) {
+                        shortWeatherText = weatherText.split('。')[0];
+                    }
+                    if (shortWeatherText.length > 10) {
+                        shortWeatherText = shortWeatherText.substring(0, 10) + '...';
+                    }
+                    
+                    // Shorten wind text for mobile (keep main wind info, remove details)
+                    let shortWindText = windText;
+                    // Extract main wind direction and force (e.g., "東風4至5級")
+                    const windMatch = windText.match(/([東南西北]+風\d+[至\d]*級)/);
+                    if (windMatch) {
+                        shortWindText = windMatch[1];
+                    } else if (shortWindText.length > 12) {
+                        shortWindText = shortWindText.substring(0, 12) + '...';
+                    }
+
                     row.innerHTML = `
-                        <td class="px-4 py-3 text-sm font-medium text-gray-900">${formattedDate}</td>
-                        <td class="px-4 py-3 text-sm text-gray-700">${forecast.week || ''}</td>
-                        <td class="px-4 py-3 text-center">
+                        <td class="px-2 py-2 md:px-4 md:py-3 text-xs md:text-sm font-medium text-gray-900">${formattedDate}</td>
+                        <td class="px-2 py-2 md:px-4 md:py-3 text-xs md:text-sm text-gray-700 hidden sm:table-cell">${forecast.week || ''}</td>
+                        <td class="px-2 py-1 md:px-4 md:py-3 text-center">
                             <div class="flex flex-col items-center">
-                                <span class="text-xl mb-1">${weatherIcon}</span>
-                                <span class="text-sm text-gray-700">${forecast.forecastWeather || 'N/A'}</span>
+                                <span class="text-lg md:text-xl mb-0.5 md:mb-1">${weatherIcon}</span>
+                                <span class="text-xs md:text-sm text-gray-700 leading-tight">
+                                    <span class="md:hidden">${shortWeatherText}</span>
+                                    <span class="hidden md:inline">${weatherText}</span>
+                                </span>
                             </div>
                         </td>
-                        <td class="px-4 py-3 text-center text-sm font-semibold text-gray-900">${tempDisplay}</td>
-                        <td class="px-4 py-3 text-center text-sm text-gray-700">${rhDisplay}</td>
-                        <td class="px-4 py-3 text-center text-sm text-gray-700">${forecast.forecastWind || 'N/A'}</td>
+                        <td class="px-2 py-2 md:px-4 md:py-3 text-center text-xs md:text-sm font-semibold text-gray-900 whitespace-nowrap">${tempDisplay}</td>
+                        <td class="px-2 py-2 md:px-4 md:py-3 text-center text-xs md:text-sm text-gray-700 hidden md:table-cell">${rhDisplay}</td>
+                        <td class="px-2 py-1 md:px-4 md:py-3 text-center text-xs md:text-sm text-gray-700 leading-tight">
+                            <span class="md:hidden">${shortWindText}</span>
+                            <span class="hidden md:inline">${windText}</span>
+                        </td>
                     `;
 
                     tbody.appendChild(row);
