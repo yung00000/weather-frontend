@@ -63,40 +63,54 @@
             <strong>錯誤：</strong>無法載入天氣資料，請稍後再試。
         </div>
 
-        <!-- Current Location Weather -->
-        <div id="currentLocationWeather" class="hidden weather-card rounded-2xl p-6 text-white mb-8 shadow-xl">
-            <div class="text-center">
-                <h2 class="text-2xl font-bold mb-3">📍 您的位置</h2>
-                <div id="currentLocationInfo" class="text-base mb-3"></div>
-                
-                <!-- Temperature and Rainfall Row -->
-                <div class="flex justify-center items-center space-x-8 mb-3">
-                    <div class="text-center">
-                        <div class="text-sm text-white/80 mb-1">氣溫</div>
-                        <div id="currentLocationTemp" class="text-3xl font-bold"></div>
-                    </div>
-                    <div class="w-px h-12 bg-white/30"></div>
-                    <div class="text-center">
-                        <div class="text-sm text-white/80 mb-1">雨量</div>
-                        <div id="currentLocationRainfall" class="text-3xl font-bold"></div>
-                    </div>
-                </div>
-                
-                <div id="currentLocationDetails" class="text-sm text-white/80"></div>
-            </div>
-        </div>
-
-        <!-- Main Weather Info -->
+        <!-- Combined Weather Info -->
         <div id="mainWeather" class="hidden weather-card rounded-2xl p-8 text-white mb-8 shadow-xl">
-            <div class="grid md:grid-cols-2 gap-6">
-                <div>
-                    <h2 class="text-2xl font-semibold mb-4">當前天氣概況</h2>
-                    <div id="condition" class="text-lg leading-relaxed"></div>
-                    <div id="humidity" class="text-lg mt-2"></div>
+            <div class="grid md:grid-cols-3 gap-6">
+                <!-- Left Column: Location & Current Conditions -->
+                <div class="md:col-span-2">
+                    <h2 class="text-2xl font-semibold mb-4">🌤️ 當前天氣概況</h2>
+                    
+                    <!-- Location Info (if available) -->
+                    <div id="locationSection" class="hidden mb-4 pb-4 border-b border-white/20">
+                        <div class="flex items-center gap-2 mb-2">
+                            <span class="text-lg">📍</span>
+                            <span class="text-lg font-semibold">您的位置</span>
+                        </div>
+                        <div id="currentLocationInfo" class="text-sm text-white/80 mb-2"></div>
+                        <div id="currentLocationDetails" class="text-sm text-white/80"></div>
+                    </div>
+                    
+                    <!-- Weather Conditions -->
+                    <div class="mb-4">
+                        <div id="condition" class="text-lg leading-relaxed mb-2"></div>
+                        <div id="humidity" class="text-lg"></div>
+                    </div>
+                    
+                    <!-- Temperature and Rainfall -->
+                    <div class="flex items-center gap-6 mt-4">
+                        <div class="flex-1">
+                            <div class="text-sm text-white/80 mb-1">氣溫</div>
+                            <div id="combinedTemperature" class="text-3xl font-bold text-white"></div>
+                        </div>
+                        <div class="w-px h-12 bg-white/30"></div>
+                        <div class="flex-1">
+                            <div class="text-sm text-white/80 mb-1">雨量</div>
+                            <div id="combinedRainfall" class="text-3xl font-bold text-white"></div>
+                        </div>
+                    </div>
                 </div>
+                
+                <!-- Right Column: Update Time -->
                 <div>
                     <h3 class="text-xl font-semibold mb-4">更新時間</h3>
-                    <div id="updateTime" class="text-lg"></div>
+                    <div id="updateTime" class="text-lg mb-4"></div>
+                    
+                    <!-- Additional Info -->
+                    <div class="mt-6 pt-6 border-t border-white/20">
+                        <div class="text-sm text-white/80">
+                            <div id="stationInfo" class="hidden"></div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -198,8 +212,9 @@
         function showLoading() {
             document.getElementById('loading').classList.remove('hidden');
             document.getElementById('error').classList.add('hidden');
-            document.getElementById('currentLocationWeather').classList.add('hidden');
             document.getElementById('mainWeather').classList.add('hidden');
+            document.getElementById('locationSection').classList.add('hidden');
+            document.getElementById('stationInfo').classList.add('hidden');
             document.getElementById('warningSection').classList.add('hidden');
             document.getElementById('tcMessageSection').classList.add('hidden');
             document.getElementById('temperatureSection').classList.add('hidden');
@@ -243,6 +258,41 @@
             document.getElementById('updateTime').textContent = weatherData.updateTime 
                 ? new Date(weatherData.updateTime).toLocaleString('zh-HK') 
                 : '暫無資料';
+            
+            // Display temperature and rainfall in combined card
+            // If location is available, use nearest station data; otherwise use first available or general data
+            if (userLocation && nearestTempStation) {
+                const temp = nearestTempStation.value !== undefined 
+                    ? `${nearestTempStation.value}°C` 
+                    : '暫無資料';
+                document.getElementById('combinedTemperature').textContent = temp;
+            } else if (weatherData.temperature?.length > 0) {
+                // Use first temperature station or average if available
+                const firstTemp = weatherData.temperature[0];
+                const temp = firstTemp.value !== undefined 
+                    ? `${firstTemp.value}°C` 
+                    : '暫無資料';
+                document.getElementById('combinedTemperature').textContent = temp;
+            } else {
+                document.getElementById('combinedTemperature').textContent = '暫無資料';
+            }
+            
+            if (userLocation && nearestRainfallStation) {
+                const rainfall = nearestRainfallStation.max !== undefined 
+                    ? `${nearestRainfallStation.max}mm` 
+                    : '暫無資料';
+                document.getElementById('combinedRainfall').textContent = rainfall;
+            } else if (weatherData.rainfall?.length > 0) {
+                // Use first rainfall station if available
+                const firstRainfall = weatherData.rainfall[0];
+                const rainfall = firstRainfall.max !== undefined 
+                    ? `${firstRainfall.max}mm` 
+                    : '暫無資料';
+                document.getElementById('combinedRainfall').textContent = rainfall;
+            } else {
+                document.getElementById('combinedRainfall').textContent = '暫無資料';
+            }
+            
             document.getElementById('mainWeather').classList.remove('hidden');
 
             // Warning Messages
@@ -467,46 +517,18 @@
             return nearestStation;
         }
 
-        // Display current location weather
+        // Display current location weather in combined card
         function displayCurrentLocationWeather() {
-            if (!userLocation || (!nearestTempStation && !nearestRainfallStation)) {
-                document.getElementById('currentLocationWeather').classList.add('hidden');
+            if (!userLocation) {
+                document.getElementById('locationSection').classList.add('hidden');
                 return;
             }
 
-            // Display location info
+            // Show location section in combined card
             const locationInfo = `緯度: ${userLocation.latitude.toFixed(4)}, 經度: ${userLocation.longitude.toFixed(4)}`;
             document.getElementById('currentLocationInfo').textContent = locationInfo;
 
-            // Display temperature
-            if (nearestTempStation) {
-                const temp = nearestTempStation.value !== undefined 
-                    ? `${nearestTempStation.value}°C` 
-                    : '暫無資料';
-                const tempElement = document.getElementById('currentLocationTemp');
-                tempElement.textContent = temp;
-                // Use white text for visibility on gradient background
-                tempElement.className = 'text-3xl font-bold text-white';
-            } else {
-                document.getElementById('currentLocationTemp').textContent = '暫無資料';
-                document.getElementById('currentLocationTemp').className = 'text-3xl font-bold text-white';
-            }
-
-            // Display rainfall
-            if (nearestRainfallStation) {
-                const rainfall = nearestRainfallStation.max !== undefined 
-                    ? `${nearestRainfallStation.max}mm` 
-                    : '暫無資料';
-                const rainElement = document.getElementById('currentLocationRainfall');
-                rainElement.textContent = rainfall;
-                // Use white text for visibility on gradient background
-                rainElement.className = 'text-3xl font-bold text-white';
-            } else {
-                document.getElementById('currentLocationRainfall').textContent = '暫無資料';
-                document.getElementById('currentLocationRainfall').className = 'text-3xl font-bold text-white';
-            }
-
-            // Display details
+            // Display station details
             let details = [];
             if (nearestTempStation) {
                 details.push(`最近氣溫站: ${nearestTempStation.place || '未知'}`);
@@ -522,7 +544,36 @@
             }
             document.getElementById('currentLocationDetails').textContent = details.join(' • ');
 
-            document.getElementById('currentLocationWeather').classList.remove('hidden');
+            // Update temperature and rainfall in combined card
+            if (nearestTempStation) {
+                const temp = nearestTempStation.value !== undefined 
+                    ? `${nearestTempStation.value}°C` 
+                    : '暫無資料';
+                document.getElementById('combinedTemperature').textContent = temp;
+            }
+            
+            if (nearestRainfallStation) {
+                const rainfall = nearestRainfallStation.max !== undefined 
+                    ? `${nearestRainfallStation.max}mm` 
+                    : '暫無資料';
+                document.getElementById('combinedRainfall').textContent = rainfall;
+            }
+
+            // Show station info in right column
+            let stationInfo = [];
+            if (nearestTempStation) {
+                stationInfo.push(`氣溫站: ${nearestTempStation.place || '未知'}`);
+            }
+            if (nearestRainfallStation) {
+                stationInfo.push(`雨量站: ${nearestRainfallStation.place || '未知'}`);
+            }
+            if (stationInfo.length > 0) {
+                document.getElementById('stationInfo').textContent = stationInfo.join('\n');
+                document.getElementById('stationInfo').classList.remove('hidden');
+            }
+
+            // Show location section
+            document.getElementById('locationSection').classList.remove('hidden');
         }
 
         // Handle location button click
