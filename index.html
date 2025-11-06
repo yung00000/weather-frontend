@@ -723,12 +723,11 @@
                     const row = document.createElement('tr');
                     row.className = 'hover:bg-gray-50 transition-colors';
 
-                    // Format date (YYYYMMDD to readable format)
+                    // Format date (YYYYMMDD to DD/MM format)
                     const dateStr = forecast.forecastDate;
-                    const year = dateStr.substring(0, 4);
-                    const month = dateStr.substring(4, 6);
                     const day = dateStr.substring(6, 8);
-                    const formattedDate = `${year}/${month}/${day}`;
+                    const month = dateStr.substring(4, 6);
+                    const formattedDate = `${day}/${month}`;
 
                     // Temperature range
                     const maxTemp = forecast.forecastMaxtemp?.value || 'N/A';
