@@ -167,6 +167,11 @@
 
     <script>
         let weatherData = null;
+        let userLocation = null;
+        let nearestTempStation = null;
+        let nearestRainfallStation = null;
+        let temperatureStations = [];
+        let rainfallStations = [];
 
         async function fetchWeatherData() {
             try {
@@ -214,24 +219,22 @@
         async function displayWeatherData() {
             if (!weatherData) return;
 
-            // Try to get user location and find nearest stations
-            try {
-                if (!userLocation) {
-                    await getCurrentLocation();
+            // Try to find nearest stations if location is already available
+            // Don't automatically request location - user must click the button
+            if (userLocation) {
+                try {
+                    if (weatherData.temperature?.length > 0) {
+                        nearestTempStation = findNearestStation(weatherData.temperature);
+                    }
+                    
+                    if (weatherData.rainfall?.length > 0) {
+                        nearestRainfallStation = findNearestStation(weatherData.rainfall);
+                    }
+                    
+                    displayCurrentLocationWeather();
+                } catch (error) {
+                    console.log('Error finding nearest stations:', error.message);
                 }
-                
-                if (weatherData.temperature?.length > 0) {
-                    nearestTempStation = findNearestStation(weatherData.temperature);
-                }
-                
-                if (weatherData.rainfall?.length > 0) {
-                    nearestRainfallStation = findNearestStation(weatherData.rainfall);
-                }
-                
-                displayCurrentLocationWeather();
-            } catch (error) {
-                console.log('Location access denied or unavailable:', error.message);
-                // Continue without location data
             }
 
             // Main Weather Info
@@ -352,8 +355,214 @@
             return 'text-gray-400';
         }
 
+        // GPS Location Functions
+        function getCurrentLocation() {
+            return new Promise((resolve, reject) => {
+                if (!navigator.geolocation) {
+                    reject(new Error('Geolocation is not supported by your browser'));
+                    return;
+                }
+
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        userLocation = {
+                            latitude: position.coords.latitude,
+                            longitude: position.coords.longitude
+                        };
+                        console.log('Location obtained:', userLocation);
+                        resolve(userLocation);
+                    },
+                    (error) => {
+                        console.error('Error getting location:', error);
+                        reject(error);
+                    },
+                    {
+                        enableHighAccuracy: true,
+                        timeout: 10000,
+                        maximumAge: 0
+                    }
+                );
+            });
+        }
+
+        // Calculate distance between two coordinates using Haversine formula
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371; // Earth's radius in kilometers
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = 
+                Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            return R * c; // Distance in kilometers
+        }
+
+        // Find nearest station based on GPS coordinates
+        function findNearestStation(stations) {
+            if (!userLocation || !stations || stations.length === 0) {
+                return null;
+            }
+
+            let nearestStation = null;
+            let minDistance = Infinity;
+
+            // Hong Kong weather station coordinates (approximate)
+            // If stations have coordinates, use them; otherwise use place name mapping
+            const stationCoordinates = {
+                '中環': { lat: 22.2819, lon: 114.1556 },
+                '香港天文台': { lat: 22.3027, lon: 114.1773 },
+                '京士柏': { lat: 22.3114, lon: 114.1747 },
+                '黃竹坑': { lat: 22.2464, lon: 114.1694 },
+                '打鼓嶺': { lat: 22.5347, lon: 114.1417 },
+                '流浮山': { lat: 22.4708, lon: 113.9856 },
+                '沙田': { lat: 22.3792, lon: 114.1894 },
+                '屯門': { lat: 22.3947, lon: 113.9728 },
+                '將軍澳': { lat: 22.3075, lon: 114.2569 },
+                '西貢': { lat: 22.3144, lon: 114.2611 },
+                '長洲': { lat: 22.2067, lon: 114.0281 },
+                '赤鱲角': { lat: 22.3081, lon: 113.9181 },
+                '青衣': { lat: 22.3542, lon: 114.1081 },
+                '石崗': { lat: 22.4342, lon: 114.0811 },
+                '荃灣': { lat: 22.3708, lon: 114.1125 },
+                '九龍城': { lat: 22.3208, lon: 114.1894 },
+                '觀塘': { lat: 22.3111, lon: 114.2258 },
+                '跑馬地': { lat: 22.2708, lon: 114.1819 },
+                '深水埗': { lat: 22.3308, lon: 114.1611 },
+                '啟德': { lat: 22.3081, lon: 114.2147 }
+            };
+
+            stations.forEach(station => {
+                let stationLat, stationLon;
+
+                // Try to get coordinates from station data first
+                if (station.lat && station.lon) {
+                    stationLat = station.lat;
+                    stationLon = station.lon;
+                } else if (station.latitude && station.longitude) {
+                    stationLat = station.latitude;
+                    stationLon = station.longitude;
+                } else if (station.place && stationCoordinates[station.place]) {
+                    // Use mapped coordinates based on place name
+                    stationLat = stationCoordinates[station.place].lat;
+                    stationLon = stationCoordinates[station.place].lon;
+                } else {
+                    // Skip if no coordinates available
+                    return;
+                }
+
+                const distance = calculateDistance(
+                    userLocation.latitude,
+                    userLocation.longitude,
+                    stationLat,
+                    stationLon
+                );
+
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    nearestStation = { ...station, distance: distance };
+                }
+            });
+
+            return nearestStation;
+        }
+
+        // Display current location weather
+        function displayCurrentLocationWeather() {
+            if (!userLocation || (!nearestTempStation && !nearestRainfallStation)) {
+                document.getElementById('currentLocationWeather').classList.add('hidden');
+                return;
+            }
+
+            // Display location info
+            const locationInfo = `緯度: ${userLocation.latitude.toFixed(4)}, 經度: ${userLocation.longitude.toFixed(4)}`;
+            document.getElementById('currentLocationInfo').textContent = locationInfo;
+
+            // Display temperature
+            if (nearestTempStation) {
+                const temp = nearestTempStation.value !== undefined 
+                    ? `${nearestTempStation.value}°C` 
+                    : '暫無資料';
+                const tempElement = document.getElementById('currentLocationTemp');
+                tempElement.textContent = temp;
+                // Use white text for visibility on gradient background
+                tempElement.className = 'text-3xl font-bold text-white';
+            } else {
+                document.getElementById('currentLocationTemp').textContent = '暫無資料';
+                document.getElementById('currentLocationTemp').className = 'text-3xl font-bold text-white';
+            }
+
+            // Display rainfall
+            if (nearestRainfallStation) {
+                const rainfall = nearestRainfallStation.max !== undefined 
+                    ? `${nearestRainfallStation.max}mm` 
+                    : '暫無資料';
+                const rainElement = document.getElementById('currentLocationRainfall');
+                rainElement.textContent = rainfall;
+                // Use white text for visibility on gradient background
+                rainElement.className = 'text-3xl font-bold text-white';
+            } else {
+                document.getElementById('currentLocationRainfall').textContent = '暫無資料';
+                document.getElementById('currentLocationRainfall').className = 'text-3xl font-bold text-white';
+            }
+
+            // Display details
+            let details = [];
+            if (nearestTempStation) {
+                details.push(`最近氣溫站: ${nearestTempStation.place || '未知'}`);
+                if (nearestTempStation.distance) {
+                    details.push(`距離: ${nearestTempStation.distance.toFixed(2)} 公里`);
+                }
+            }
+            if (nearestRainfallStation && nearestRainfallStation.place !== nearestTempStation?.place) {
+                details.push(`最近雨量站: ${nearestRainfallStation.place || '未知'}`);
+                if (nearestRainfallStation.distance) {
+                    details.push(`距離: ${nearestRainfallStation.distance.toFixed(2)} 公里`);
+                }
+            }
+            document.getElementById('currentLocationDetails').textContent = details.join(' • ');
+
+            document.getElementById('currentLocationWeather').classList.remove('hidden');
+        }
+
+        // Handle location button click
+        async function handleLocationButtonClick() {
+            try {
+                const button = document.getElementById('locationBtn');
+                button.disabled = true;
+                button.textContent = '📍 獲取位置中...';
+
+                await getCurrentLocation();
+
+                if (weatherData) {
+                    if (weatherData.temperature?.length > 0) {
+                        nearestTempStation = findNearestStation(weatherData.temperature);
+                    }
+                    if (weatherData.rainfall?.length > 0) {
+                        nearestRainfallStation = findNearestStation(weatherData.rainfall);
+                    }
+                    displayCurrentLocationWeather();
+                }
+
+                button.disabled = false;
+                button.textContent = '📍 獲取我的位置';
+            } catch (error) {
+                alert('無法獲取您的位置。請確保已允許瀏覽器訪問位置權限。\n\n' + error.message);
+                const button = document.getElementById('locationBtn');
+                button.disabled = false;
+                button.textContent = '📍 獲取我的位置';
+            }
+        }
+
         // Event listeners
         document.getElementById('refreshBtn').addEventListener('click', fetchWeatherData);
+        document.getElementById('locationBtn').addEventListener('click', handleLocationButtonClick);
+        document.getElementById('temperatureSelect').addEventListener('change', (e) => {
+            displaySelectedTemperature(e.target.value);
+        });
+        document.getElementById('rainfallSelect').addEventListener('change', (e) => {
+            displaySelectedRainfall(e.target.value);
+        });
 
         // Initial load
         fetchWeatherData();
