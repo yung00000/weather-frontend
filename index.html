@@ -77,14 +77,42 @@
         <!-- Temperature Stations -->
         <div id="temperatureSection" class="hidden mb-8">
             <h2 class="text-2xl font-bold text-gray-800 mb-6">🌡️ 各區氣溫</h2>
-            <div id="temperatureGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"></div>
+            <div class="mb-4">
+                <label for="temperatureSelect" class="block text-sm font-medium text-gray-700 mb-2">選擇地區：</label>
+                <select id="temperatureSelect" class="w-full md:w-64 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-800">
+                    <option value="">請選擇地區</option>
+                </select>
+            </div>
+            <div id="temperatureDisplay" class="hidden bg-white rounded-lg p-6 shadow-md">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h3 id="temperaturePlace" class="text-xl font-semibold text-gray-800"></h3>
+                        <p class="text-sm text-gray-600">氣溫</p>
+                    </div>
+                    <div id="temperatureValue" class="text-3xl font-bold"></div>
+                </div>
+            </div>
         </div>
 
         <!-- Rainfall Stations -->
         <div id="rainfallSection" class="hidden mb-8">
             <h2 class="text-2xl font-bold text-gray-800 mb-6">🌧️ 各區雨量</h2>
             <p id="rainfallTime" class="text-gray-600 mb-4"></p>
-            <div id="rainfallGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"></div>
+            <div class="mb-4">
+                <label for="rainfallSelect" class="block text-sm font-medium text-gray-700 mb-2">選擇地區：</label>
+                <select id="rainfallSelect" class="w-full md:w-64 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-800">
+                    <option value="">請選擇地區</option>
+                </select>
+            </div>
+            <div id="rainfallDisplay" class="hidden bg-white rounded-lg p-6 shadow-md">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h3 id="rainfallPlace" class="text-xl font-semibold text-gray-800"></h3>
+                        <p class="text-sm text-gray-600">過去一小時雨量</p>
+                    </div>
+                    <div id="rainfallValue" class="text-3xl font-bold"></div>
+                </div>
+            </div>
         </div>
 
         <!-- Refresh Button -->
@@ -97,6 +125,8 @@
 
     <script>
         let weatherData = null;
+        let temperatureStations = [];
+        let rainfallStations = [];
 
         async function fetchWeatherData() {
             try {
@@ -127,7 +157,9 @@
             document.getElementById('warningSection').classList.add('hidden');
             document.getElementById('tcMessageSection').classList.add('hidden');
             document.getElementById('temperatureSection').classList.add('hidden');
+            document.getElementById('temperatureDisplay').classList.add('hidden');
             document.getElementById('rainfallSection').classList.add('hidden');
+            document.getElementById('rainfallDisplay').classList.add('hidden');
         }
 
         function hideLoading() {
@@ -164,72 +196,82 @@
 
             // Temperature Data
             if (weatherData.temperature?.length > 0) {
-                displayTemperatureData(weatherData.temperature);
+                temperatureStations = weatherData.temperature;
+                populateTemperatureDropdown(weatherData.temperature);
                 document.getElementById('temperatureSection').classList.remove('hidden');
+                document.getElementById('temperatureSelect').value = '';
+                document.getElementById('temperatureDisplay').classList.add('hidden');
             }
 
             // Rainfall Data
             if (weatherData.rainfall?.length > 0) {
-                displayRainfallData(weatherData.rainfall);
+                rainfallStations = weatherData.rainfall;
+                populateRainfallDropdown(weatherData.rainfall);
                 document.getElementById('rainfallTime').textContent = weatherData.rainfallTime?.startTime && weatherData.rainfallTime?.endTime 
                     ? `記錄時間: ${new Date(weatherData.rainfallTime.startTime).toLocaleString('zh-HK')} 至 ${new Date(weatherData.rainfallTime.endTime).toLocaleString('zh-HK')}`
                     : '暫無時間資料';
                 document.getElementById('rainfallSection').classList.remove('hidden');
+                document.getElementById('rainfallSelect').value = '';
+                document.getElementById('rainfallDisplay').classList.add('hidden');
             }
         }
 
-        function displayTemperatureData(tempData) {
-            const grid = document.getElementById('temperatureGrid');
-            grid.innerHTML = '';
-
-            tempData.forEach(station => {
-                const card = document.createElement('div');
-                card.className = 'station-card bg-white rounded-lg p-4 shadow-md';
-                
-                const temp = station.value !== undefined ? `${station.value}°C` : '暫無資料';
-                const tempColor = getTemperatureColor(station.value);
-                
-                card.innerHTML = `
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <h3 class="font-semibold text-gray-800">${station.place}</h3>
-                            <p class="text-sm text-gray-600">${station.unit || ''}</p>
-                        </div>
-                        <div class="text-2xl font-bold ${tempColor}">
-                            ${temp}
-                        </div>
-                    </div>
-                `;
-                
-                grid.appendChild(card);
+        function populateTemperatureDropdown(tempData) {
+            const select = document.getElementById('temperatureSelect');
+            select.innerHTML = '<option value="">請選擇地區</option>';
+            
+            tempData.forEach((station, index) => {
+                const option = document.createElement('option');
+                option.value = index;
+                option.textContent = station.place || '未知地區';
+                select.appendChild(option);
             });
         }
 
-        function displayRainfallData(rainData) {
-            const grid = document.getElementById('rainfallGrid');
-            grid.innerHTML = '';
-
-            rainData.forEach(station => {
-                const card = document.createElement('div');
-                card.className = 'station-card bg-white rounded-lg p-4 shadow-md';
-                
-                const rainfall = station.max !== undefined ? `${station.max}mm` : '暫無資料';
-                const rainColor = getRainfallColor(station.max);
-                
-                card.innerHTML = `
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <h3 class="font-semibold text-gray-800">${station.place}</h3>
-                            <p class="text-sm text-gray-600">過去一小時</p>
-                        </div>
-                        <div class="text-2xl font-bold ${rainColor}">
-                            ${rainfall}
-                        </div>
-                    </div>
-                `;
-                
-                grid.appendChild(card);
+        function populateRainfallDropdown(rainData) {
+            const select = document.getElementById('rainfallSelect');
+            select.innerHTML = '<option value="">請選擇地區</option>';
+            
+            rainData.forEach((station, index) => {
+                const option = document.createElement('option');
+                option.value = index;
+                option.textContent = station.place || '未知地區';
+                select.appendChild(option);
             });
+        }
+
+        function displaySelectedTemperature(index) {
+            if (index === '' || !temperatureStations[index]) {
+                document.getElementById('temperatureDisplay').classList.add('hidden');
+                return;
+            }
+
+            const station = temperatureStations[index];
+            const temp = station.value !== undefined ? `${station.value}°C` : '暫無資料';
+            const tempColor = getTemperatureColor(station.value);
+
+            document.getElementById('temperaturePlace').textContent = station.place || '未知地區';
+            const valueElement = document.getElementById('temperatureValue');
+            valueElement.textContent = temp;
+            valueElement.className = `text-3xl font-bold ${tempColor}`;
+            document.getElementById('temperatureDisplay').classList.remove('hidden');
+        }
+
+        function displaySelectedRainfall(index) {
+            if (index === '' || !rainfallStations[index]) {
+                document.getElementById('rainfallDisplay').classList.add('hidden');
+                return;
+            }
+
+            const station = rainfallStations[index];
+            const rainfall = station.max !== undefined ? `${station.max}mm` : '暫無資料';
+            const rainColor = getRainfallColor(station.max);
+
+            document.getElementById('rainfallPlace').textContent = station.place || '未知地區';
+            const valueElement = document.getElementById('rainfallValue');
+            valueElement.textContent = rainfall;
+            valueElement.className = `text-3xl font-bold ${rainColor}`;
+            document.getElementById('rainfallDisplay').classList.remove('hidden');
         }
 
         function getTemperatureColor(temp) {
@@ -251,6 +293,12 @@
 
         // Event listeners
         document.getElementById('refreshBtn').addEventListener('click', fetchWeatherData);
+        document.getElementById('temperatureSelect').addEventListener('change', (e) => {
+            displaySelectedTemperature(e.target.value);
+        });
+        document.getElementById('rainfallSelect').addEventListener('change', (e) => {
+            displaySelectedRainfall(e.target.value);
+        });
 
         // Initial load
         fetchWeatherData();
